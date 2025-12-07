@@ -1,0 +1,18 @@
+# Core Framework
+fastapi==0.110.0
+uvicorn==0.27.1        # Server to run FastAPI
+pydantic==2.6.3        # Data validation
+
+# AI & Orchestration
+langchain==0.1.12
+langchain-core==0.1.32
+langgraph==0.0.26      # The state machine
+langchain-groq==0.0.1  # Or langchain-google-genai if you prefer Gemini
+
+# GitHub Integration
+PyGithub==2.2.0        # Official Python wrapper for GitHub API
+
+# Utilities
+python-dotenv==1.0.1   # To manage API Keys
+requests==2.31.0
+tiktoken==0.6.0        # For counting tokens (making sure we don't overflow)
