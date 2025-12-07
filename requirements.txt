@@ -16,3 +16,4 @@ PyGithub==2.2.0        # Official Python wrapper for GitHub API
 python-dotenv==1.0.1   # To manage API Keys
 requests==2.31.0
 tiktoken==0.6.0        # For counting tokens (making sure we don't overflow)
+mangum==0.17.0

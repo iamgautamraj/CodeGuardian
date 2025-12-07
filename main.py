@@ -64,3 +64,6 @@ async def handle_webhook(request: Request, x_hub_signature_256: str = Header(Non
 @app.get("/")
 def read_root():
     return {"message": "CodeGuardian is running!"}
+
+from mangum import Mangum
+handler = Mangum(app)
