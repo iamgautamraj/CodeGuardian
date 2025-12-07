@@ -97,6 +97,24 @@ workflow.add_edge("analyzer", END)       # Finish
 # Compile
 app = workflow.compile()
 
+def post_github_comment(repo_name: str, pr_number: int, comment_body: str):
+    """
+    Posts the AI review as a comment on the Pull Request.
+    """
+    try:
+        repo = g.get_repo(repo_name)
+        pr = repo.get_pull(pr_number)
+        
+        # Create a formatted comment
+        final_comment = f"## 🤖 CodeGuardian AI Review\n\n{comment_body}"
+        
+        # Post it!
+        pr.create_issue_comment(final_comment)
+        print(f"✅ Comment posted to PR #{pr_number}")
+        
+    except Exception as e:
+        print(f"❌ Error posting comment: {e}")
+
 def run_review_agent(repo_name: str, pr_number: int):
     """
     Wrapper function to run the graph from the API.

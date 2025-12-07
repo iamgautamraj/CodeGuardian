@@ -5,8 +5,8 @@ import json
 from fastapi import FastAPI, Request, HTTPException, Header
 from dotenv import load_dotenv
 
-# IMPORT THE AGENT
-from agent import run_review_agent
+# --- IMPORTS FROM AGENT ---
+from agent import run_review_agent, post_github_comment
 
 load_dotenv()
 
@@ -30,29 +30,36 @@ def verify_signature(payload_body: bytes, signature_header: str):
 
 @app.post("/webhook")
 async def handle_webhook(request: Request, x_hub_signature_256: str = Header(None)):
+    # 1. Read and Verify
     payload_body = await request.body()
     verify_signature(payload_body, x_hub_signature_256)
-    payload = await request.json()
     
+    # 2. Parse Data
+    payload = await request.json()
     event_type = request.headers.get("X-GitHub-Event", "ping")
     
+    # 3. Handle PR Events
     if event_type == "pull_request":
         action = payload.get("action")
-        # We only care when a PR is opened or updated (synchronized)
+        
+        # Only run on Open or Update
         if action in ["opened", "synchronize"]:
             pr_number = payload.get("number")
             repo_name = payload["repository"]["full_name"]
             
             print(f"🚀 Starting Review for PR #{pr_number} in {repo_name}...")
             
-            # --- TRIGGER THE AGENT ---
+            # --- A. TRIGGER THE AGENT ---
             review = run_review_agent(repo_name, pr_number)
             
-            print(f"✅ Review Finished:\n{review}")
+            print(f"✅ Review Generated. Posting to GitHub...")
+
+            # --- B. POST COMMENT ---
+            post_github_comment(repo_name, pr_number, review)
             
-            # TODO: Post this review back to GitHub as a comment
+            return {"status": "ok", "message": "Review posted successfully"}
             
-    return {"status": "ok"}
+    return {"status": "ok", "message": "Event ignored (not an open/sync PR)"}
 
 @app.get("/")
 def read_root():
