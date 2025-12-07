@@ -5,6 +5,9 @@ import json
 from fastapi import FastAPI, Request, HTTPException, Header
 from dotenv import load_dotenv
 
+# IMPORT THE AGENT
+from agent import run_review_agent
+
 load_dotenv()
 
 app = FastAPI()
@@ -12,9 +15,6 @@ app = FastAPI()
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 
 def verify_signature(payload_body: bytes, signature_header: str):
-    """
-    Verify that the request actually came from GitHub.
-    """
     if not signature_header:
         raise HTTPException(status_code=403, detail="x-hub-signature-256 header is missing!")
     
@@ -30,27 +30,29 @@ def verify_signature(payload_body: bytes, signature_header: str):
 
 @app.post("/webhook")
 async def handle_webhook(request: Request, x_hub_signature_256: str = Header(None)):
-    # 1. Read the raw body
     payload_body = await request.body()
-    
-    # 2. Verify security
     verify_signature(payload_body, x_hub_signature_256)
-    
-    # 3. Parse JSON
     payload = await request.json()
     
-    # 4. Check for PR events
     event_type = request.headers.get("X-GitHub-Event", "ping")
     
     if event_type == "pull_request":
         action = payload.get("action")
-        pr_number = payload.get("number")
-        repo_name = payload["repository"]["full_name"]
-        print(f"✅ Received PR Event! Action: {action}, PR #{pr_number} in {repo_name}")
-        
-        # TODO: Trigger LangGraph agent here later
-        
-    return {"status": "ok", "message": "Webhook received successfully"}
+        # We only care when a PR is opened or updated (synchronized)
+        if action in ["opened", "synchronize"]:
+            pr_number = payload.get("number")
+            repo_name = payload["repository"]["full_name"]
+            
+            print(f"🚀 Starting Review for PR #{pr_number} in {repo_name}...")
+            
+            # --- TRIGGER THE AGENT ---
+            review = run_review_agent(repo_name, pr_number)
+            
+            print(f"✅ Review Finished:\n{review}")
+            
+            # TODO: Post this review back to GitHub as a comment
+            
+    return {"status": "ok"}
 
 @app.get("/")
 def read_root():

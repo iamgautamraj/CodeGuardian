@@ -20,7 +20,7 @@ g = Github(github_token)
 groq_api_key = os.getenv("GROQ_API_KEY")
 llm = ChatGroq(
     temperature=0, 
-    model_name="llama3-70b-8192", 
+    model_name="llama-3.3-70b-versatile", 
     groq_api_key=groq_api_key
 )
 
@@ -96,6 +96,20 @@ workflow.add_edge("analyzer", END)       # Finish
 
 # Compile
 app = workflow.compile()
+
+def run_review_agent(repo_name: str, pr_number: int):
+    """
+    Wrapper function to run the graph from the API.
+    Returns the review string.
+    """
+    input_state = {
+        "repo_name": repo_name,
+        "pr_number": pr_number,
+        "diff": "",
+        "review": ""
+    }
+    result = app.invoke(input_state)
+    return result["review"]
 
 # --- 5. TEST IT LOCALLY ---
 if __name__ == "__main__":
