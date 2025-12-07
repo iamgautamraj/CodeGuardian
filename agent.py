@@ -1,60 +1,116 @@
 import os
-from github import Github
+from typing import TypedDict, List
 from dotenv import load_dotenv
+from github import Github
+
+# LangChain / LangGraph Imports
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_groq import ChatGroq
+from langgraph.graph import StateGraph, END
 
 load_dotenv()
 
-# 1. Initialize GitHub Client
+# --- 1. SETUP API CLIENTS ---
+# GitHub
 github_token = os.getenv("GITHUB_TOKEN")
-if not github_token:
-    raise ValueError("GITHUB_TOKEN not found in .env")
-
 g = Github(github_token)
 
-def fetch_pr_diff(repo_name: str, pr_number: int) -> str:
-    """
-    Fetches the changes (diff) for a specific PR.
-    Returns a formatted string of the changed files.
-    """
-    try:
-        # Get the repo object
-        repo = g.get_repo(repo_name)
-        
-        # Get the specific PR object
-        pr = repo.get_pull(pr_number)
-        
-        diff_data = ""
-        
-        # Loop through all files changed in this PR
-        for file in pr.get_files():
-            # We skip deleted files or non-text files (images/binaries)
-            if file.status == "removed":
-                continue
-                
-            # Construct a clear format for the LLM to read
-            diff_data += f"--- File: {file.filename} ---\n"
-            
-            # If there is a patch (the actual diff), add it. 
-            # If the file is huge or binary, patch might be None.
-            if file.patch:
-                diff_data += file.patch + "\n\n"
-            else:
-                diff_data += "(File content too large or binary, skipped)\n\n"
-                
-        return diff_data
-        
-    except Exception as e:
-        print(f"Error fetching PR: {e}")
-        return ""
+# LLM (Groq - Llama 3)
+groq_api_key = os.getenv("GROQ_API_KEY")
+llm = ChatGroq(
+    temperature=0, 
+    model_name="llama3-70b-8192", 
+    groq_api_key=groq_api_key
+)
 
-# Simple test block to run this file directly
-if __name__ == "__main__":
-    # REPLACE THIS with the repo/pr number from your terminal log earlier!
-    test_repo = "iamgautamraj/CodeGuardian" 
-    test_pr_number = 1 
+# --- 2. DEFINE STATE ---
+# This dictionary carries data between nodes
+class AgentState(TypedDict):
+    repo_name: str
+    pr_number: int
+    diff: str
+    review: str
+
+# --- 3. DEFINE NODES ---
+
+def fetch_diff_node(state: AgentState):
+    """
+    Node 1: Fetches the PR diff from GitHub
+    """
+    print(f"--- Node 1: Fetching Diff for PR #{state['pr_number']} ---")
+    repo = g.get_repo(state["repo_name"])
+    pr = repo.get_pull(state["pr_number"])
     
-    print("Fetching diff...")
-    diff = fetch_pr_diff(test_repo, test_pr_number)
-    print("--- DIFF START ---")
-    print(diff)
-    print("--- DIFF END ---")
+    diff_data = ""
+    for file in pr.get_files():
+        if file.status == "removed":
+            continue
+        diff_data += f"--- File: {file.filename} ---\n"
+        if file.patch:
+            diff_data += file.patch + "\n\n"
+            
+    return {"diff": diff_data}
+
+def analyze_code_node(state: AgentState):
+    """
+    Node 2: Asks Llama 3 to review the code
+    """
+    print("--- Node 2: Analyzing Code with Llama 3 ---")
+    
+    # The Prompt Engineering part
+    system_prompt = """You are a Senior Software Engineer doing a code review.
+    Analyze the provided Git Diff.
+    Focus on:
+    1. Bugs or logic errors.
+    2. Security vulnerabilities.
+    3. Code style issues (PEP8 for Python).
+    
+    If the code looks good, just say "LGTM" (Looks Good To Me).
+    Be concise and professional.
+    """
+    
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("user", "Here is the diff:\n\n{diff}")
+    ])
+    
+    # Chain: Prompt -> LLM -> String Output
+    chain = prompt | llm | StrOutputParser()
+    
+    review_result = chain.invoke({"diff": state["diff"]})
+    
+    return {"review": review_result}
+
+# --- 4. BUILD THE GRAPH ---
+workflow = StateGraph(AgentState)
+
+# Add nodes
+workflow.add_node("fetcher", fetch_diff_node)
+workflow.add_node("analyzer", analyze_code_node)
+
+# Add edges (The flow logic)
+workflow.set_entry_point("fetcher")      # Start here
+workflow.add_edge("fetcher", "analyzer") # Go to analyzer
+workflow.add_edge("analyzer", END)       # Finish
+
+# Compile
+app = workflow.compile()
+
+# --- 5. TEST IT LOCALLY ---
+if __name__ == "__main__":
+    # Use your real repo details again
+    test_input = {
+        "repo_name": "iamgautamraj/CodeGuardian", 
+        "pr_number": 1,
+        "diff": "",   # Empty initially
+        "review": ""  # Empty initially
+    }
+    
+    print("🚀 Starting Agent Workflow...")
+    result = app.invoke(test_input)
+    
+    print("\n✅ WORKFLOW FINISHED!")
+    print("================ REVIEW RESULTS ================")
+    print(result["review"])
+    print("================================================")
