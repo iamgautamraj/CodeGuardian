@@ -59,25 +59,29 @@ AWS CLI (configured)
 
 GitHub Account
 
-1. Local Development
+### 1. Local Development
 
 Clone the repo and install dependencies:
 
-git clone [https://github.com/yourusername/CodeGuardian.git](https://github.com/yourusername/CodeGuardian.git)
+''git clone [https://github.com/yourusername/CodeGuardian.git](https://github.com/yourusername/CodeGuardian.git)
+
 cd CodeGuardian
-pip install -r requirements.txt
+
+pip install -r requirements.txt''
 
 
 Create a .env file:
 
-GITHUB_TOKEN="your_personal_access_token"
+''GITHUB_TOKEN="your_personal_access_token"
+
 GROQ_API_KEY="your_groq_api_key"
-WEBHOOK_SECRET="your_random_secret_string"
+
+WEBHOOK_SECRET="your_random_secret_string"''
 
 
 Run the local server:
 
-uvicorn main:app --reload
+''uvicorn main:app --reload''
 
 
 (Use ngrok or GitHub Codespaces to expose port 8000 to the internet for webhook testing)
@@ -87,12 +91,14 @@ uvicorn main:app --reload
 Build and Push the Docker Image:
 
 ### Login to AWS ECR
-aws ecr get-login-password --region your-region | docker login --username AWS --password-stdin your-account-id.dkr.ecr.your-region.amazonaws.com
+''aws ecr get-login-password --region your-region | docker login --username AWS --password-stdin your-account-id.dkr.ecr.your-region.amazonaws.com''
 
 ### Build & Push
-docker build -t code-guardian .
+''docker build -t code-guardian .
+
 docker tag code-guardian:latest [your-account-id.dkr.ecr.your-region.amazonaws.com/code-guardian:latest](https://your-account-id.dkr.ecr.your-region.amazonaws.com/code-guardian:latest)
-docker push [your-account-id.dkr.ecr.your-region.amazonaws.com/code-guardian:latest](https://your-account-id.dkr.ecr.your-region.amazonaws.com/code-guardian:latest)
+
+docker push [your-account-id.dkr.ecr.your-region.amazonaws.com/code-guardian:latest](https://your-account-id.dkr.ecr.your-region.amazonaws.com/code-guardian:latest)''
 
 
 ## Lambda Configuration:
